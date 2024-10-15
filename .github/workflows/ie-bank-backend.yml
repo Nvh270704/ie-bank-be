@@ -11,7 +11,8 @@ permissions:
   id-token: write
 
 env:
-  BACKEND_WEBAPP_DEV: jseijas-be-dev
+  BACKEND_WEBAPP_DEV: nvalderrama-be-dev
+  BACKEND_WEBAPP_UAT: nvalderrama-be-uat
 
 jobs:
   build:
@@ -21,9 +22,9 @@ jobs:
       ENV: ghci
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Set up Python 3.11
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v5
       with:
         python-version: "3.11"
     - name: Upgrade pip
@@ -49,7 +50,7 @@ jobs:
         path: |
           . 
 
-  deploy:
+  deploy-DEV:
     runs-on: ubuntu-latest
     needs: build
     environment:
@@ -68,9 +69,35 @@ jobs:
         creds: ${{ secrets.AZURE_CREDENTIALS }}
 
     - name: 'Deploy to Azure Web App'
-      uses: azure/webapps-deploy@v2
+      uses: azure/webapps-deploy@v3
       id: deploy-to-webapp
       with:
         app-name: ${{ env.BACKEND_WEBAPP_DEV }}
         package: .
+
+  deploy-UAT:
+    runs-on: ubuntu-latest
+    #if the build job is successful, then the deployment job will run
+    needs: [build, deploy-dev]
+    environment:
+      name: 'Development'
+      url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
+
+    steps:
+    - name: Download artifact from build job
+      uses: actions/download-artifact@v4
+      with:
+        name: python-app
+        path: .
     
+    - uses: azure/login@v2
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: 'Deploy to Azure Web App'
+      uses: azure/webapps-deploy@v3
+      id: deploy-to-webapp
+      with:
+        app-name: ${{ env.BACKEND_WEBAPP_DEV }}
+        package: .
+        
